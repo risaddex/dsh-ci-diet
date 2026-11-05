@@ -57,7 +57,8 @@
     "smoke:node": "node dist/cli/index.js --version",
     "check:contracts": "node scripts/sync-contracts.mjs --check",
     "test:docs": "node scripts/check-docs.mjs",
-    "test:plugin": "node --test tests/unit/dsh-plugin.test.ts"
+    "test:plugin": "node --test tests/unit/dsh-plugin.test.ts",
+    "bundle:plugin": "bun scripts/bundle-plugin.mjs"
   },
   "dependencies": {
     "ajv": "^8.17.1",

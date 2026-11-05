@@ -33,6 +33,8 @@ function memoryFs(
     realpath: (path) => options.realpaths?.[path] ?? path,
     readdir: (path) => {
       if (options.readdirError !== undefined) throw options.readdirError;
+      // Gitea/Forgejo directories do not exist in this fake repository.
+      if (!path.includes(".github")) throw Object.assign(new Error("ENOENT: " + path), { code: "ENOENT" });
       assert.equal(path, DIRECTORY);
       return options.entries ?? [];
     },

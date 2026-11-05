@@ -56,7 +56,7 @@ function coverageFor(
       },
       workflowDefinitions: {
         status: failed ? "partial" : "complete",
-        scope: ".github/workflows (repository root)",
+        scope: ".gitea|.forgejo|.github/workflows (repository root)",
         fetched: parsed,
         expected,
         reasons: failed ? ["WORKFLOW_PARSE_FAILURES"] : [],

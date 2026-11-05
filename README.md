@@ -27,6 +27,13 @@ dsh --profile web
 
 The plugin registers DSH tools plus the **Settings → CI Diet** and **CI Diet review** screens. Installation alone does not scan a repository, save runner minutes, or modify a workflow. If you skip the global CLI install, use `npx dsh-ci-diet@0.5.2` in place of `ci-diet`.
 
+## Fork additions: Gitea and Claude Code / Codex
+
+This fork (`risaddex/dsh-ci-diet`) adds:
+
+- **Gitea / Forgejo Actions.** Workflows are read from `.gitea/workflows`, `.forgejo/workflows`, then `.github/workflows` (first existing directory wins). History sync talks to the Gitea REST API: set `GITEA_URL` (and `GITEA_TOKEN` for private repositories), then run `ci-diet sync --network --provider gitea`. The provider is chosen automatically when `origin` is on the `GITEA_URL` host. Gitea has no artifact-retention policy, branch-rule, or compare-files endpoints, so those coverage axes report `unavailable`.
+- **Claude Code / Codex plugin** in [`plugin/`](plugin/): manifests plus a skill that drives a single-file CLI bundle (`bun run bundle:plugin` writes `plugin/bin/cli.mjs`).
+
 ## First scan and history
 
 Run these commands from the repository you want to inspect. The static scan is offline and saves its report. History sync is a separate network step that reads recent runs and jobs through the authenticated `gh` CLI using read-only GitHub API requests.

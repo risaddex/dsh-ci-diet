@@ -3,6 +3,11 @@
 All notable changes to this project are recorded here. The format follows
 Keep a Changelog, and the project uses semantic versioning.
 
+## Unreleased (fork)
+
+- Gitea/Forgejo Actions: `.gitea`/`.forgejo` workflow discovery, `--provider gitea` history sync via `GITEA_URL`/`GITEA_TOKEN`.
+- Claude Code and Codex plugin under `plugin/`, with `bun run bundle:plugin`.
+
 ## 0.5.2 (2026-10-26)
 
 - Map the installed bundle's `include:<entry>` inventory id back to the

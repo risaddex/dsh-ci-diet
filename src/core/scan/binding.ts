@@ -6,26 +6,37 @@ import { digestOf, sha256Hex } from "../../shared/cdj1.ts";
 import type { RepositoryBinding } from "../contracts/schema.ts";
 
 export interface GithubRemote {
+  /** Remote host; `github.com` unless an extra (Gitea/Forgejo) host was allowed. */
+  readonly host: string;
   readonly owner: string;
   readonly repository: string;
   readonly fullName: string;
 }
 
-const REMOTE_PATTERNS: readonly RegExp[] = [
-  /^https?:\/\/(?:[^@/]+@)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i,
-  /^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i,
-  /^ssh:\/\/git@github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i,
-];
+const escapeHost = (host: string): string => host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-export function parseGithubRemote(url: string): GithubRemote | null {
+function remotePatterns(host: string): readonly RegExp[] {
+  const h = escapeHost(host);
+  const tail = String.raw`([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$`;
+  return [
+    new RegExp("^https?:\\/\\/(?:[^@/]+@)?" + h + "\\/" + tail, "i"),
+    new RegExp("^git@" + h + ":" + tail, "i"),
+    new RegExp("^ssh:\\/\\/git@" + h + "(?::[0-9]+)?\\/" + tail, "i"),
+  ];
+}
+
+/** Parse a remote URL for github.com or any extra allowed host (for example a Gitea instance). */
+export function parseGithubRemote(url: string, extraHosts: readonly string[] = []): GithubRemote | null {
   const trimmed = url.trim();
-  for (const pattern of REMOTE_PATTERNS) {
-    const match = pattern.exec(trimmed);
-    if (!match) continue;
-    const owner = match[1];
-    const repository = match[2];
-    if (owner === undefined || repository === undefined) return null;
-    return { owner, repository, fullName: owner + "/" + repository };
+  for (const host of ["github.com", ...extraHosts]) {
+    for (const pattern of remotePatterns(host)) {
+      const match = pattern.exec(trimmed);
+      if (!match) continue;
+      const owner = match[1];
+      const repository = match[2];
+      if (owner === undefined || repository === undefined) return null;
+      return { host: host.toLowerCase(), owner, repository, fullName: owner + "/" + repository };
+    }
   }
   return null;
 }
@@ -77,6 +88,8 @@ export interface ReadGithubRemoteOptions {
   readonly commandRunner?: CommandRunner;
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
+  /** Additional hosts (Gitea/Forgejo) whose remotes count as repositories. */
+  readonly extraHosts?: readonly string[];
 }
 
 export type GithubRemoteLookup =
@@ -93,7 +106,7 @@ export function lookupGithubRemote(workspaceRoot: string, options: ReadGithubRem
       timeoutMs: options.timeoutMs ?? DEFAULT_REMOTE_TIMEOUT_MS,
       ...(options.signal === undefined ? {} : { signal: options.signal }),
     });
-    const remote = parseGithubRemote(result.stdout.trim());
+    const remote = parseGithubRemote(result.stdout.trim(), options.extraHosts ?? []);
     return remote === null ? { kind: "none" } : { kind: "github", remote };
   } catch (error) {
     // A plain directory or a repository without origin simply has no GitHub

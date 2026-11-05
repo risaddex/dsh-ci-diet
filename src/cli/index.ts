@@ -9,6 +9,7 @@ import { runStaticScan } from "../core/scan/scan.ts";
 import { createLocalBinding, lookupGithubRemote } from "../core/scan/binding.ts";
 import { discoverWorkflows } from "../core/scan/discover.ts";
 import { parseWorkflow } from "../core/workflow/parse.ts";
+import { createGiteaRunner, giteaFromEnv, giteaHost } from "../adapters/gitea/runner.ts";
 import { syncRepositoryHistory } from "../core/history/sync.ts";
 import { defaultStateDir } from "../core/state/paths.ts";
 import { buildHistoryReport } from "../core/analysis/report.ts";
@@ -125,6 +126,7 @@ interface Options {
   readonly report: string | null;
   readonly format: "text" | "json" | "html";
   readonly appliedBackups: boolean;
+  readonly provider: "github" | "gitea" | null;
   readonly config: Config;
 }
 
@@ -168,6 +170,7 @@ function parseArgs(argv: readonly string[]): Options {
   let report: string | null = null;
   let format: "text" | "json" | "html" = "text";
   let appliedBackups = false;
+  let provider: "github" | "gitea" | null = null;
 
   const takeValue = (index: number, flag: string): string => {
     const value = argv[index + 1];
@@ -198,6 +201,11 @@ function parseArgs(argv: readonly string[]): Options {
       index += 1;
     } else if (arg === "--lang") {
       lang = takeValue(index, "--lang");
+      index += 1;
+    } else if (arg === "--provider") {
+      const value = takeValue(index, "--provider");
+      if (value !== "github" && value !== "gitea") throw new UsageError("INVALID_VALUE:--provider");
+      provider = value;
       index += 1;
     } else if (arg === "--repo") {
       repo = takeValue(index, "--repo");
@@ -323,6 +331,7 @@ function parseArgs(argv: readonly string[]): Options {
     report,
     format,
     appliedBackups,
+    provider,
   };
 }
 
@@ -441,6 +450,9 @@ async function sync(options: Options, locale: Locale): Promise<number> {
   const discovery = discoverWorkflows(options.cwd, { maxBytes: options.config.storage.workflowMaxBytes });
   const workflows = discovery.workflows.map((file) => parseWorkflow(file.path, file.text));
 
+  const gitea = giteaFromEnv(context.env);
+  const giteaHostName = gitea === null ? null : giteaHost(gitea.baseUrl);
+  let remoteHost: string | null = null;
   let owner: string;
   let repository: string;
   if (options.repo !== null) {
@@ -448,7 +460,7 @@ async function sync(options: Options, locale: Locale): Promise<number> {
     owner = parsed.owner;
     repository = parsed.repository;
   } else {
-    const lookup = lookupGithubRemote(discovery.root);
+    const lookup = lookupGithubRemote(discovery.root, giteaHostName === null ? {} : { extraHosts: [giteaHostName] });
     if (lookup.kind === "error") {
       const detail = lookup.error instanceof Error ? lookup.error.message : String(lookup.error);
       writeErr(t("cli.sync.remoteUnavailable", { detail }) + "\n");
@@ -460,6 +472,17 @@ async function sync(options: Options, locale: Locale): Promise<number> {
     }
     owner = lookup.remote.owner;
     repository = lookup.remote.repository;
+    remoteHost = lookup.remote.host;
+  }
+  const provider = options.provider ?? (remoteHost !== null && remoteHost === giteaHostName ? "gitea" : "github");
+  let giteaRunner: ReturnType<typeof createGiteaRunner> | undefined;
+  if (provider === "gitea") {
+    if (gitea === null) {
+      writeErr("Gitea provider needs GITEA_URL (and GITEA_TOKEN for private repositories).\n");
+      return EXIT_USAGE;
+    }
+    const byFile = new Map(discovery.workflows.map((file) => [file.path.split("/").at(-1) ?? file.path, file.path] as const));
+    giteaRunner = createGiteaRunner({ ...gitea, workflowPath: (file) => byFile.get(file) ?? ".gitea/workflows/" + file });
   }
 
   if ((options.accountMinutesUsed === null) !== (options.includedMinutes === null)) {
@@ -480,6 +503,7 @@ async function sync(options: Options, locale: Locale): Promise<number> {
     enabledRules: options.rules ?? undefined,
     owner,
     repo: repository,
+    ...(giteaRunner === undefined ? {} : { runner: giteaRunner }),
     config,
     now: now(),
     ...(context.signal === undefined ? {} : { signal: context.signal }),
