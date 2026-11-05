@@ -9,3 +9,4 @@ dist/
 coverage/
 evidence/a0a/raw/
 evidence/a0a/workflow-yaml.json
+/plugin/bin/

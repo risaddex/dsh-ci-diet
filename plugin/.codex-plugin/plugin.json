@@ -1,0 +1,34 @@
+{
+  "name": "ci-diet",
+  "version": "0.5.2",
+  "description": "Encontra tempo de runner desperdiçado em GitHub Actions e Gitea Actions e prepara pequenos patches YAML revisáveis. Fork do dsh-ci-diet com suporte a Gitea.",
+  "author": {
+    "name": "risaddex"
+  },
+  "homepage": "https://github.com/risaddex/dsh-ci-diet",
+  "repository": "https://github.com/risaddex/dsh-ci-diet",
+  "license": "MIT",
+  "keywords": [
+    "ci",
+    "github-actions",
+    "gitea-actions",
+    "cost-optimization",
+    "workflow"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "CI Diet",
+    "shortDescription": "Corta minutos de CI em GitHub e Gitea Actions",
+    "longDescription": "Analisa workflows de GitHub Actions e Gitea Actions, lê o histórico de execuções com acesso somente leitura e prepara patches YAML pequenos que só são aplicados com aprovação humana.",
+    "developerName": "risaddex",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ],
+    "defaultPrompt": [
+      "Rode um scan estático dos workflows deste repositório e resuma os achados do CI Diet.",
+      "Colete o histórico de execuções deste repositório Gitea e mostre onde o runner está sendo desperdiçado."
+    ]
+  }
+}

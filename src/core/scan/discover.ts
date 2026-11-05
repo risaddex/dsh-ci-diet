@@ -6,7 +6,12 @@ import type { FileSystem } from "../support/filesystem.ts";
 export const WORKFLOW_MAX_BYTES = 512 * 1024;
 
 const WORKFLOW_FILE = /\.ya?ml$/i;
-const WORKFLOW_DIR = [".github", "workflows"];
+/** Gitea and Forgejo read their own directory first and fall back to `.github`; mirror that. */
+export const WORKFLOW_DIRS: readonly (readonly string[])[] = [
+  [".gitea", "workflows"],
+  [".forgejo", "workflows"],
+  [".github", "workflows"],
+];
 
 export type SkippedWorkflowReason =
   | "WORKFLOW_TOO_LARGE"
@@ -46,7 +51,8 @@ function insideRoot(root: string, candidate: string): boolean {
 }
 
 /**
- * Discover `.github/workflows/*.yml|yaml` without following links.
+ * Discover `.gitea|.forgejo|.github/workflows/*.yml|yaml` without following links.
+ * The first existing directory wins, as on Gitea.
  *
  * The scan is deliberately shallow: GitHub only reads the top level of the
  * workflows directory, and following a junction could read outside the root.
@@ -58,20 +64,26 @@ export function discoverWorkflows(
   const maxBytes = options.maxBytes ?? WORKFLOW_MAX_BYTES;
   const fs = options.fs ?? nodeFileSystem;
   const root = fs.realpath(workspaceRoot);
-  const directory = join(root, ...WORKFLOW_DIR);
   const workflows: DiscoveredWorkflow[] = [];
   const skipped: SkippedWorkflow[] = [];
 
   let entries;
-  try {
-    entries = [...fs.readdir(directory)];
-  } catch (error) {
-    // A missing workflows directory is normal; other failures mean coverage is incomplete.
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      skipped.push({ path: toPosix(join(...WORKFLOW_DIR)), reason: "WORKFLOW_UNREADABLE" });
+  let directory = join(root, ...WORKFLOW_DIRS[0]!);
+  for (const parts of WORKFLOW_DIRS) {
+    const candidate = join(root, ...parts);
+    try {
+      entries = [...fs.readdir(candidate)];
+      directory = candidate;
+      break;
+    } catch (error) {
+      // A missing workflows directory is normal; other failures mean coverage is incomplete.
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        skipped.push({ path: toPosix(join(...parts)), reason: "WORKFLOW_UNREADABLE" });
+        return { root, workflows, skipped };
+      }
     }
-    return { root, workflows, skipped };
   }
+  if (entries === undefined) return { root, workflows, skipped };
 
   entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   for (const entry of entries) {

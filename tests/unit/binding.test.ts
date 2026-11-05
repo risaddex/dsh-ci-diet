@@ -14,7 +14,7 @@ describe("readGithubRemote", () => {
     const remote = readGithubRemote(root, {
       commandRunner: runnerReturning("git@github.com:0disoft/dsh-ci-diet.git\n"),
     });
-    assert.deepEqual(remote, { owner: "0disoft", repository: "dsh-ci-diet", fullName: "0disoft/dsh-ci-diet" });
+    assert.deepEqual(remote, { host: "github.com", owner: "0disoft", repository: "dsh-ci-diet", fullName: "0disoft/dsh-ci-diet" });
   });
 
   it("returns null when the origin is missing", () => {
